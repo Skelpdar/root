@@ -93,7 +93,7 @@ class R__CLING_PTRCHECK(off) RColumnValue {
    /// Enumerator for the different properties of the branch storage in memory
    enum class EStorageType : char { kContiguous, kUnknown, kSparse };
    /// Signal whether we ever checked that the branch we are reading with a TTreeReaderArray stores array elements
-   /// in contiguous memory. Only used when T == RVec<U>.
+   /// in contiguous memory. Only used when T == RVec\<U\>.
    EStorageType fStorageType = EStorageType::kUnknown;
    /// If MustUseRVec, i.e. we are reading an array, we return a reference to this RVec to clients
    RVec<ColumnValue_t> fRVec;
@@ -305,16 +305,16 @@ extern template class RColumnValue<std::vector<ULong64_t>>;
 #endif
 
 template <typename T>
-struct TRDFValueTuple {
+struct RDFValueTuple {
 };
 
 template <typename... BranchTypes>
-struct TRDFValueTuple<TypeList<BranchTypes...>> {
+struct RDFValueTuple<TypeList<BranchTypes...>> {
    using type = std::tuple<RColumnValue<BranchTypes>...>;
 };
 
 template <typename BranchType>
-using RDFValueTuple_t = typename TRDFValueTuple<BranchType>::type;
+using RDFValueTuple_t = typename RDFValueTuple<BranchType>::type;
 
 /// Clear the proxies of a tuple of RColumnValues
 template <typename ValueTuple, std::size_t... S>

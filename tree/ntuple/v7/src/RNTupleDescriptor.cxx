@@ -13,6 +13,7 @@
  * For the list of contributors see $ROOTSYS/README/CREDITS.             *
  *************************************************************************/
 
+#include <ROOT/RError.hxx>
 #include <ROOT/RField.hxx>
 #include <ROOT/RNTupleDescriptor.hxx>
 #include <ROOT/RNTupleModel.hxx>
@@ -760,6 +761,25 @@ std::unique_ptr<ROOT::Experimental::RNTupleModel> ROOT::Experimental::RNTupleDes
 ////////////////////////////////////////////////////////////////////////////////
 
 
+ROOT::Experimental::RResult<void>
+ROOT::Experimental::RNTupleDescriptorBuilder::EnsureValidDescriptor() const {
+   // Reuse field name validity check
+   auto validName = Detail::RFieldBase::EnsureValidFieldName(fDescriptor.GetName());
+   if (!validName) {
+      return R__FORWARD_ERROR(validName);
+   }
+   // open-ended list of invariant checks
+   for (const auto& key_val: fDescriptor.fFieldDescriptors) {
+      const auto& id = key_val.first;
+      const auto& desc = key_val.second;
+      // parent not properly set
+      if (id != DescriptorId_t(0) && desc.GetParentId() == kInvalidDescriptorId) {
+         return R__FAIL("field with id '" + std::to_string(id) + "' has an invalid parent id");
+      }
+   }
+   return RResult<void>::Success();
+}
+
 ROOT::Experimental::RNTupleDescriptor ROOT::Experimental::RNTupleDescriptorBuilder::MoveDescriptor()
 {
    RNTupleDescriptor result;
@@ -948,11 +968,30 @@ void ROOT::Experimental::RNTupleDescriptorBuilder::AddField(const RFieldDescript
    fDescriptor.fFieldDescriptors.emplace(fieldDesc.GetId(), fieldDesc.Clone());
 }
 
-void ROOT::Experimental::RNTupleDescriptorBuilder::AddFieldLink(DescriptorId_t fieldId, DescriptorId_t linkId)
+ROOT::Experimental::RResult<void>
+ROOT::Experimental::RNTupleDescriptorBuilder::AddFieldLink(DescriptorId_t fieldId, DescriptorId_t linkId)
 {
-   R__ASSERT(fDescriptor.fFieldDescriptors[linkId].fParentId == kInvalidDescriptorId);
-   fDescriptor.fFieldDescriptors[linkId].fParentId = fieldId;
-   fDescriptor.fFieldDescriptors[fieldId].fLinkIds.push_back(linkId);
+   if (linkId == DescriptorId_t(0)) {
+      return R__FAIL("cannot make FieldZero a child field");
+   }
+   if (fDescriptor.fFieldDescriptors.count(fieldId) == 0) {
+      return R__FAIL("field with id '" + std::to_string(fieldId) + "' doesn't exist in NTuple");
+   }
+   if (fDescriptor.fFieldDescriptors.count(linkId) == 0) {
+      return R__FAIL("child field with id '" + std::to_string(linkId) + "' doesn't exist in NTuple");
+   }
+   // fail if field already has a valid parent
+   auto parentId = fDescriptor.fFieldDescriptors.at(linkId).GetParentId();
+   if (parentId != kInvalidDescriptorId) {
+      return R__FAIL("field '" + std::to_string(linkId) + "' already has a parent ('" +
+         std::to_string(parentId) + ")");
+   }
+   if (fieldId == linkId) {
+      return R__FAIL("cannot make field '" + std::to_string(fieldId) + "' a child of itself");
+   }
+   fDescriptor.fFieldDescriptors.at(linkId).fParentId = fieldId;
+   fDescriptor.fFieldDescriptors.at(fieldId).fLinkIds.push_back(linkId);
+   return RResult<void>::Success();
 }
 
 void ROOT::Experimental::RNTupleDescriptorBuilder::AddColumn(

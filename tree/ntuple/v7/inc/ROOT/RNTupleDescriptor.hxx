@@ -547,7 +547,10 @@ private:
    RNTupleDescriptor fDescriptor;
 
 public:
-   bool IsValid() const { return true; /* TODO(jblomer) */}
+   /// Checks whether invariants hold:
+   /// * NTuple name is valid
+   /// * Fields have valid parent and child ids
+   RResult<void> EnsureValidDescriptor() const;
    const RNTupleDescriptor& GetDescriptor() const { return fDescriptor; }
    RNTupleDescriptor MoveDescriptor();
 
@@ -555,7 +558,7 @@ public:
                   const RNTupleVersion &version, const RNTupleUuid &uuid);
 
    void AddField(const RFieldDescriptor& fieldDesc);
-   void AddFieldLink(DescriptorId_t fieldId, DescriptorId_t linkId);
+   RResult<void> AddFieldLink(DescriptorId_t fieldId, DescriptorId_t linkId);
 
    void AddColumn(DescriptorId_t columnId, DescriptorId_t fieldId,
                   const RNTupleVersion &version, const RColumnModel &model, std::uint32_t index);

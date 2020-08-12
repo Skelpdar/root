@@ -589,8 +589,9 @@ extern "C" const Decl* TCling__GetObjectDecl(TObject *obj) {
 extern "C" R__DLLEXPORT TInterpreter *CreateInterpreter(void* interpLibHandle,
                                                         const char* argv[])
 {
+   auto tcling = new TCling("C++", "cling C++ Interpreter", argv);
    cling::DynamicLibraryManager::ExposeHiddenSharedLibrarySymbols(interpLibHandle);
-   return new TCling("C++", "cling C++ Interpreter", argv);
+   return tcling;
 }
 
 extern "C" R__DLLEXPORT void DestroyInterpreter(TInterpreter *interp)
@@ -1399,7 +1400,7 @@ TCling::TCling(const char *name, const char *title, const char* const argv[])
    }
 
    auto GetEnvVarPath = [](const std::string &EnvVar,
-                            std::vector<std::string> &Paths) {
+                       std::vector<std::string> &Paths) {
       llvm::Optional<std::string> EnvOpt = llvm::sys::Process::GetEnv(EnvVar);
       if (EnvOpt.hasValue()) {
          StringRef Env(*EnvOpt);
@@ -1423,7 +1424,6 @@ TCling::TCling(const char *name, const char *title, const char* const argv[])
       Paths.push_back(TROOT::GetLibDir().Data());
 #endif
       GetEnvVarPath("CLING_PREBUILT_MODULE_PATH", Paths);
-      //GetEnvVarPath("LD_LIBRARY_PATH", Paths);
       std::string EnvVarPath;
       for (const std::string& P : Paths)
          EnvVarPath += P + ROOT::FoundationUtils::GetEnvPathSeparator();
@@ -1441,26 +1441,19 @@ TCling::TCling(const char *name, const char *title, const char* const argv[])
    // flag is passed.
    if (fCxxModulesEnabled && !fromRootCling) {
       // For now we prefer rootcling to enumerate explicitly its modulemaps.
-      std::vector<std::string> Paths;
-      Paths.push_back(TROOT::GetIncludeDir().Data());
-      GetEnvVarPath("CLING_MODULEMAP_PATH", Paths);
+      std::vector<std::string> ModuleMaps;
+      std::string ModuleMapSuffix = ROOT::FoundationUtils::GetPathSeparator() + "module.modulemap";
+      ModuleMaps.push_back(TROOT::GetIncludeDir().Data() + ModuleMapSuffix);
+      GetEnvVarPath("CLING_MODULEMAP_FILES", ModuleMaps);
 
-      // Give highest precedence of the modulemap in the cwd.
-      Paths.push_back(gSystem->WorkingDirectory());
+      std::string cwd = gSystem->WorkingDirectory();
+      // Give highest precedence of the modulemap in the cwd if any.
+      if (llvm::sys::fs::exists(cwd + ModuleMapSuffix))
+         ModuleMaps.push_back(cwd + ModuleMapSuffix);
 
-      for (const std::string& P : Paths) {
-         std::string ModuleMapLoc = P + ROOT::FoundationUtils::GetPathSeparator()
-            + "module.modulemap";
-         if (!llvm::sys::fs::exists(ModuleMapLoc)) {
-            if (gDebug > 1)
-               ::Info("TCling::TCling", "Modulemap %s does not exist \n",
-                      ModuleMapLoc.c_str());
+      for (const std::string& M : ModuleMaps)
+         clingArgsStorage.push_back("-fmodule-map-file=" + M);
 
-            continue;
-         }
-
-         clingArgsStorage.push_back("-fmodule-map-file=" + ModuleMapLoc);
-      }
       std::string ModulesCachePath;
       EnvOpt = llvm::sys::Process::GetEnv("CLING_MODULES_CACHE_PATH");
       if (EnvOpt.hasValue()){
@@ -2574,10 +2567,15 @@ void TCling::PrintIntro()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Add the given path to the list of directories in which the interpreter
-/// looks for include files. Only one path item can be specified at a
-/// time, i.e. "path1:path2" is NOT supported.
-
+/// \brief Add a directory to the list of directories in which the
+///        interpreter looks for include files.
+/// \param[in] path The path to the directory.
+/// \note Only one path item can be specified at a time, i.e. "path1:path2" is
+///       \b NOT supported.
+/// \warning Only the path to the directory should be specified, without
+///          prepending the \c -I prefix, i.e.
+///          <tt>gCling->AddIncludePath("/path/to/my/includes")</tt>. If the
+///          \c -I prefix is used it will be ignored.
 void TCling::AddIncludePath(const char *path)
 {
    R__LOCKGUARD(gInterpreterMutex);
@@ -5392,10 +5390,10 @@ int TCling::ReadRootmapFile(const char *rootmapfile, TUniqueString *uniqueString
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Create a resource table and read the (possibly) three resource files, i.e
-/// $ROOTSYS/etc/system<name> (or ROOTETCDIR/system<name>), $HOME/<name> and
-/// ./<name>. ROOT always reads ".rootrc" (in TROOT::InitSystem()). You can
-/// read additional user defined resource files by creating additional TEnv
+/// Create a resource table and read the (possibly) three resource files,
+/// i.e.\ $ROOTSYS/etc/system<name> (or ROOTETCDIR/system<name>), $HOME/<name>
+/// and $PWD/<name>. ROOT always reads ".rootrc" (in TROOT::InitSystem()). You
+/// can read additional user defined resource files by creating additional TEnv
 /// objects. By setting the shell variable ROOTENV_NO_HOME=1 the reading of
 /// the $HOME/<name> resource file will be skipped. This might be useful in
 /// case the home directory resides on an automounted remote file system

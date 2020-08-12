@@ -1,4 +1,4 @@
-# Copyright (C) 1995-2019, Rene Brun and Fons Rademakers.
+# Copyright (C) 1995-2020, Rene Brun and Fons Rademakers.
 # All rights reserved.
 #
 # For the licensing terms see $ROOTSYS/LICENSE.
@@ -209,6 +209,7 @@ if(builtin_lzma)
       set(LIBLZMA_CFLAGS "${LIBLZMA_CFLAGS} -isysroot ${CMAKE_OSX_SYSROOT}")
     endif()
     set(LIBLZMA_LIBRARIES ${CMAKE_BINARY_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}lzma${CMAKE_STATIC_LIBRARY_SUFFIX})
+    set(LIBLZMA_CFLAGS "${LIBLZMA_CFLAGS} -O3")
     ExternalProject_Add(
       LZMA
       URL ${CMAKE_SOURCE_DIR}/core/lzma/src/xz-${lzma_version}.tar.gz
@@ -939,6 +940,21 @@ if(xrootd AND XROOTD_VERSIONNUM VERSION_GREATER 300030005)
 else()
   set(netxng OFF)
 endif()
+if(xrootd AND XROOTD_VERSIONNUM VERSION_LESS 500000000)
+  set(netx ON)
+else()
+  set(netx OFF)
+endif()
+if(xrootd AND XROOTD_VERSIONNUM VERSION_GREATER_EQUAL 500000000)
+  if(xproofd)
+    if(fail-on-missing)
+      message(FATAL_ERROR "XROOTD is version 5 or greater. The legacy xproofd servers can not be built with this version. Use -Dxproofd:BOOL=OFF to disable.")
+    else()
+      message(STATUS "XROOTD is version 5 or greater. The legacy xproofd servers can not be built with this version. Disabling 'xproofd' option.")
+      set(xproofd OFF CACHE BOOL "Disabled because xrootd version is 5 or greater" FORCE)
+    endif()
+  endif()
+endif()
 
 #---Alien support----------------------------------------------------------------
 if(alien)
@@ -1126,6 +1142,25 @@ if (jemalloc)
   find_package(jemalloc)
   if(NOT JEMALLOC_FOUND)
     message(STATUS "JEMalloc not found.")
+  endif()
+endif()
+
+#---Check for liburing----------------------------------------------------------------
+if (uring)
+  if(NOT CMAKE_SYSTEM_NAME MATCHES Linux)
+    set(uring OFF CACHE BOOL "Disabled because liburing is only available on Linux" FORCE)
+    message(STATUS "liburing was disabled because it is only available on Linux")
+  else()
+    message(STATUS "Looking for liburing")
+    find_package(liburing)
+    if(NOT LIBURING_FOUND)
+      if(fail-on-missing)
+        message(FATAL_ERROR "liburing not found and uring option required")
+      else()
+        message(STATUS "liburing not found. Switching off uring option")
+        set(uring OFF CACHE BOOL "Disabled because liburing was not found (${uring_description})" FORCE)
+      endif()
+    endif()
   endif()
 endif()
 
@@ -1476,6 +1511,30 @@ if(cuda OR tmva-gpu)
     endif()
     enable_language(CUDA)
     set(cuda ON CACHE BOOL "Found Cuda for TMVA GPU" FORCE)
+    # CUDA_NVCC_EXECUTABLE
+    if(DEFINED ENV{CUDA_NVCC_EXECUTABLE})
+      set(CUDA_NVCC_EXECUTABLE "$ENV{CUDA_NVCC_EXECUTABLE}" CACHE FILEPATH "The CUDA compiler")
+    else()
+      find_program(CUDA_NVCC_EXECUTABLE
+        NAMES nvcc nvcc.exe
+        PATHS "${CUDA_TOOLKIT_ROOT_DIR}"
+          ENV CUDA_TOOKIT_ROOT
+          ENV CUDA_PATH
+          ENV CUDA_BIN_PATH
+        PATH_SUFFIXES bin bin64
+        DOC "The CUDA compiler"
+        NO_DEFAULT_PATH
+      )
+      find_program(CUDA_NVCC_EXECUTABLE
+        NAMES nvcc nvcc.exe
+        PATHS /opt/cuda/bin
+        PATH_SUFFIXES cuda/bin
+        DOC "The CUDA compiler"
+      )
+      # Search default search paths, after we search our own set of paths.
+      find_program(CUDA_NVCC_EXECUTABLE nvcc)
+    endif()
+    mark_as_advanced(CUDA_NVCC_EXECUTABLE)
     ###
     ### look for package CuDNN
     if (cudnn)
@@ -1586,7 +1645,8 @@ endif()
 
 #---Check for deprecated PyROOT experimental ---------------------------------------------
 if(pyroot_experimental)
-  message(WARNING "pyroot_experimental is a deprecated flag from 6.22.00. To build the new PyROOT, just configure with -Dpyroot=ON.")
+  message(WARNING "pyroot_experimental is a deprecated flag from 6.22.00."
+                  "To build the new PyROOT, just configure with -Dpyroot=ON -Dpyroot_experimental=OFF.")
 endif()
 
 #---Check for MPI---------------------------------------------------------------------

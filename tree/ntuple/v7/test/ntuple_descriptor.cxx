@@ -185,7 +185,54 @@ TEST(RDanglingFieldDescriptor, MakeDescriptorErrors)
       .Structure(ENTupleStructure::kCollection)
       .MakeDescriptor();
    ASSERT_FALSE(fieldDescRes) << "unnamed field descriptors should throw";
-   EXPECT_THAT(fieldDescRes.GetError()->GetReport(), testing::HasSubstr("field name cannot be empty string"));
+   EXPECT_THAT(fieldDescRes.GetError()->GetReport(), testing::HasSubstr("name cannot be empty string"));
+}
+
+TEST(RNTupleDescriptorBuilder, CatchBadLinks)
+{
+   RNTupleDescriptorBuilder descBuilder;
+   descBuilder.AddField(RDanglingFieldDescriptor()
+      .FieldId(0)
+      .Structure(ENTupleStructure::kRecord)
+      .MakeDescriptor()
+      .Unwrap());
+   descBuilder.AddField(RDanglingFieldDescriptor()
+      .FieldId(1)
+      .FieldName("field")
+      .TypeName("int32_t")
+      .Structure(ENTupleStructure::kLeaf)
+      .MakeDescriptor()
+      .Unwrap());
+   try {
+      descBuilder.AddFieldLink(1, 0);
+   } catch (const RException& err) {
+      EXPECT_THAT(err.what(), testing::HasSubstr("cannot make FieldZero a child field"));
+   }
+   try {
+      descBuilder.AddFieldLink(1, 1);
+   } catch (const RException& err) {
+      EXPECT_THAT(err.what(), testing::HasSubstr("cannot make field '1' a child of itself"));
+   }
+   try {
+      descBuilder.AddFieldLink(1, 10);
+   } catch (const RException& err) {
+      EXPECT_THAT(err.what(), testing::HasSubstr("child field with id '10' doesn't exist in NTuple"));
+   }
+}
+
+TEST(RNTupleDescriptorBuilder, CatchInvalidDescriptors)
+{
+   RNTupleDescriptorBuilder descBuilder;
+
+   // empty string is not a valid NTuple name
+   descBuilder.SetNTuple("", "", "", RNTupleVersion(1, 2, 3), ROOT::Experimental::RNTupleUuid());
+   try {
+      descBuilder.EnsureValidDescriptor();
+   } catch (const RException& err) {
+      EXPECT_THAT(err.what(), testing::HasSubstr("name cannot be empty string"));
+   }
+   descBuilder.SetNTuple("something", "", "", RNTupleVersion(1, 2, 3), ROOT::Experimental::RNTupleUuid());
+   descBuilder.EnsureValidDescriptor();
 }
 
 TEST(RFieldDescriptorRange, IterateOverFieldNames)

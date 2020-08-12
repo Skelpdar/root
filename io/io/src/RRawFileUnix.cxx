@@ -10,9 +10,12 @@
  *************************************************************************/
 
 #include "ROOT/RConfig.hxx"
-
 #include "ROOT/RRawFileUnix.hxx"
 #include "ROOT/RMakeUnique.hxx"
+
+#ifdef R__HAS_URING
+  #include "ROOT/RIoUring.hxx"
+#endif
 
 #include "TError.h"
 
@@ -106,6 +109,20 @@ void ROOT::Internal::RRawFileUnix::OpenImpl()
    } else {
       fOptions.fBlockSize = kDefaultBlockSize;
    }
+}
+
+void ROOT::Internal::RRawFileUnix::ReadVImpl(RIOVec *ioVec, unsigned int nReq)
+{
+#ifdef R__HAS_URING
+   if (RIoUring::IsAvailable()) {
+      // todo(max) actually use the ring
+      RRawFile::ReadVImpl(ioVec, nReq);
+      return;
+   }
+   Warning("RRawFileUnix",
+           "io_uring setup failed, falling back to default ReadV implementation");
+#endif
+   RRawFile::ReadVImpl(ioVec, nReq);
 }
 
 size_t ROOT::Internal::RRawFileUnix::ReadAtImpl(void *buffer, size_t nbytes, std::uint64_t offset)

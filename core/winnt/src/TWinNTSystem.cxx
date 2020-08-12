@@ -3878,11 +3878,8 @@ void TWinNTSystem::Exit(int code, Bool_t mode)
                   else delete (TBrowser*)0x%lx", (ULong_t)b, (ULong_t)b, (ULong_t)b, (ULong_t)b));
          }
       }
-      gROOT->EndOfProcessCleanups();
    }
-   if (gInterpreter) {
-      gInterpreter->ShutDown();
-   }
+   TROOT::ShutDown();
    gVirtualX->CloseDisplay();
 
    if (mode) {
@@ -4259,6 +4256,7 @@ const char *TWinNTSystem::GetLibraries(const char *regexp, const char *options,
    TString libs(TSystem::GetLibraries(regexp, options, isRegexp));
    TString ntlibs;
    TString opt = options;
+   Bool_t in_program_files = kFALSE;
 
    if ( (opt.First('L')!=kNPOS) ) {
       TRegexp separator("[^ \\t\\s]+");
@@ -4278,6 +4276,17 @@ const char *TWinNTSystem::GetLibraries(const char *regexp, const char *options,
             s.ToLower();
             if ((s.Index("c:/windows/") != kNPOS) ||
                 (s.Index("python") != kNPOS)) {
+               start += end+1;
+               continue;
+            }
+            if (s.BeginsWith("c:/program")) {
+               in_program_files = kTRUE;
+               start += end+1;
+               continue;
+            }
+            if (in_program_files) {
+               if (s.EndsWith(".dll"))
+                  in_program_files = kFALSE;
                start += end+1;
                continue;
             }

@@ -580,7 +580,9 @@ namespace {
                                     const std::string& Filename,
                                     const std::string& Location,
                                     std::string& overlay,
-                                    bool RegisterModuleMap = true) -> void {
+                                    bool RegisterModuleMap = true,
+                                    bool AllowModulemapOverride = false)
+       -> void {
 
       assert(llvm::sys::fs::exists(SystemDir) && "Must exist!");
 
@@ -589,7 +591,7 @@ namespace {
       llvm::sys::path::append(systemLoc, modulemapFilename);
       // Check if we need to mount a custom modulemap. We may have it, for
       // instance when we are on osx or using libc++.
-      if (llvm::sys::fs::exists(systemLoc.str())) {
+      if (AllowModulemapOverride &&llvm::sys::fs::exists(systemLoc.str())) {
         if (HSOpts.Verbose)
           cling::log() << "Loading '" << systemLoc.str() << "'\n";
 
@@ -661,9 +663,11 @@ namespace {
                             clingIncLoc.str(), MOverlay);
 #else
     maybeAppendOverlayEntry(cIncLoc.str(), "libc.modulemap", clingIncLoc.str(),
-                            MOverlay);
+                            MOverlay, /*RegisterModuleMap=*/ true,
+                            /*AllowModulemapOverride=*/true);
     maybeAppendOverlayEntry(stdIncLoc.str(), "std.modulemap", clingIncLoc.str(),
-                            MOverlay);
+                            MOverlay, /*RegisterModuleMap=*/ true,
+                            /*AllowModulemapOverride=*/true);
 #endif // LLVM_ON_WIN32
 
     if (!tinyxml2IncLoc.empty())
@@ -1194,7 +1198,12 @@ static void stringifyPreprocSetting(PreprocessorOptions& PPOpts,
     const size_t argc = COpts.Remaining.size();
     const char* const* argv = &COpts.Remaining[0];
     std::vector<const char*> argvCompile(argv, argv+1);
-    argvCompile.reserve(argc+5);
+    argvCompile.reserve(argc+32);
+
+#if __APPLE__ && __arm64__
+    argvCompile.push_back("-Xclang");
+    argvCompile.push_back("-triple=arm64-apple-macosx11.0.0");
+#endif
 
     // Variables for storing the memory of the C-string arguments.
     // FIXME: We shouldn't use C-strings in the first place, but just use

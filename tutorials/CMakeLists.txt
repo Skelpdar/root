@@ -82,6 +82,8 @@ if (NOT dataframe)
     list(APPEND dataframe_veto graphs/timeSeriesFromCSV_TDF.C)
     # TMVA tutorials dependent on RDataFrame
     list(APPEND dataframe_veto tmva/tmva*.C)
+elseif(MSVC AND NOT win_broken_tests)
+    list(APPEND dataframe_veto dataframe/*.py)
 endif()
 
 if(NOT sqlite)
@@ -135,7 +137,9 @@ if(NOT xrootd)
                   dataframe/df103_NanoAODHiggsAnalysis.py
                   dataframe/df104_HiggsToTwoPhotons.py
                   dataframe/df105_WBosonAnalysis.py
-                  dataframe/df106_HiggsToFourLeptons.py)
+                  dataframe/df106_HiggsToFourLeptons.py
+                  dataframe/df107_SingleTopAnalysis.py
+                  )
 endif()
 
 # variables identifying the package must have the package name  in lower case (it corresponds to the CMake option name)
@@ -427,8 +431,9 @@ set (tmva-tmva101_Training-depends tutorial-tmva-tmva100_DataPreparation-py)
 set (tmva-tmva102_Testing-depends tutorial-tmva-tmva101_Training-py)
 
 #--List long-running tutorials to label them as "longtest"
-set (long_running dataframe/df10[2-5]*
-  multicore/mp103*)
+set (long_running
+     dataframe/df10[2-7]*
+     multicore/mp103*)
 file(GLOB long_running RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${long_running})
 
 #---Loop over all tutorials and define the corresponding test---------
@@ -520,7 +525,6 @@ if(ROOT_pyroot_FOUND)
              sql/sqlfilldb.py       # same as the C++ case
              sql/sqlselect.py       # same as the C++ case
              launcher.py            # Not a tutorial
-             dataframe/df026_AsNumpyArrays.py    # Needs pandas. Should be activated once pandas on the build nodes.
              )
 
   if(pyroot_legacy)
