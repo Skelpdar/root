@@ -44,6 +44,7 @@ The concrete implementation of TBuffer for writing/reading to/from a ROOT file o
 #include "Bswapcpy.h"
 #endif
 
+#include "ZipZFP.h"
 
 const UInt_t kNewClassTag       = 0xFFFFFFFF;
 const UInt_t kClassMask         = 0x80000000;  // OR the class index with this
@@ -1676,7 +1677,7 @@ void TBufferFile::ReadFastArray(void **start, const TClass *cl, Int_t n,
 
 void TBufferFile::WriteArray(const Bool_t *b, Int_t n)
 {
-   R__ASSERT(IsWriting());
+	R__ASSERT(IsWriting());
 
    *this << n;
 
@@ -1844,7 +1845,17 @@ void TBufferFile::WriteArray(const Long64_t *ll, Int_t n)
 
 void TBufferFile::WriteArray(const Float_t *f, Int_t n)
 {
-   R__ASSERT(IsWriting());
+	//Cast from const Float_t* to float f_array
+	
+	
+	//Find some way to specify this for every branch separately
+	float tol = 1/4096 
+
+   	float* f_zfp = R__zipZFP(f_array, (int)n, float tol)
+
+	//
+
+	R__ASSERT(IsWriting());
 
    *this << n;
 
