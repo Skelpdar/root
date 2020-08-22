@@ -11,10 +11,12 @@
 #ifndef ROOT_ZipZFP
 #define ROOT_ZipZFP
 
+#include <zfp.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-void R__zipZFP();
+void R__zipZFP(float* array, int size, float tol, void* buffer, size_t& complength);
 #ifdef __cplusplus
 }
 #endif

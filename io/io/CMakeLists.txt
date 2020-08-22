@@ -64,7 +64,13 @@ ROOT_LINKER_LIBRARY(RIO
     Thread
 )
 
-target_include_directories(RIO PRIVATE ${CMAKE_SOURCE_DIR}/core/clib/res)
+target_include_directories(RIO PRIVATE 
+	${CMAKE_SOURCE_DIR}/core/clib/res
+	${CMAKE_SOURCE_DIR}/core/zfp/inc
+	${ZFP_INCLUDE_DIR}
+	${CMAKE_SOURCE_DIR}/core/base/inc
+	${CMAKE_BINARY_DIR}/ginclude
+)
 
 if(root7)
   set(RIO_EXTRA_HEADERS ROOT/RFile.hxx)

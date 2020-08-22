@@ -45,6 +45,7 @@ The concrete implementation of TBuffer for writing/reading to/from a ROOT file o
 #endif
 
 #include "ZipZFP.h"
+#include <zfp.h>
 
 const UInt_t kNewClassTag       = 0xFFFFFFFF;
 const UInt_t kClassMask         = 0x80000000;  // OR the class index with this
@@ -1845,39 +1846,41 @@ void TBufferFile::WriteArray(const Long64_t *ll, Int_t n)
 
 void TBufferFile::WriteArray(const Float_t *f, Int_t n)
 {
-	//Cast from const Float_t* to float f_array
-	
-	
 	//Find some way to specify this for every branch separately
-	float tol = 1/4096 
+	float tol = 1/4096;
 
-   	float* f_zfp = R__zipZFP(f_array, (int)n, float tol)
+	size_t buffersize;
+	void* buffer;
+
+   	R__zipZFP((float*)f, (int)n, tol, buffer, buffersize);
 
 	//
 
 	R__ASSERT(IsWriting());
 
-   *this << n;
+   *this << buffersize;
 
-   if (n <= 0) return;
+   if (buffersize <= 0) return;
 
-   R__ASSERT(f);
+   R__ASSERT(buffer);
 
-   Int_t l = sizeof(Float_t)*n;
+   Int_t l = buffersize;
    if (fBufCur + l > fBufMax) AutoExpand(fBufSize+l);
 
-#ifdef R__BYTESWAP
-# ifdef USE_BSWAPCPY
-   bswapcpy32(fBufCur, f, n);
+//#ifdef R__BYTESWAP
+//# ifdef USE_BSWAPCPY
+//   bswapcpy32(fBufCur, f, n);
+//   fBufCur += l;
+//# else
+//   for (int i = 0; i < n; i++)
+//      tobuf(fBufCur, f[i]);
+//# endif
+//#else
+   memcpy(fBufCur, buffer, l);
    fBufCur += l;
-# else
-   for (int i = 0; i < n; i++)
-      tobuf(fBufCur, f[i]);
-# endif
-#else
-   memcpy(fBufCur, f, l);
-   fBufCur += l;
-#endif
+//#endif
+
+   free(buffer);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

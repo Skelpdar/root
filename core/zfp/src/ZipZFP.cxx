@@ -16,9 +16,7 @@
 #include <zfp.h>
 
 
-BIT_STREAM_WORD_TYPE = uint32;
-
-float* R__zipZFP(float* array, int size, float tol){
+void R__zipZFP(float* array, int size, float tol, void* buffer, size_t& complength){
 
 	zfp_type type = zfp_type_float;
 	zfp_field* arraymeta = zfp_field_1d(array, type, size);
@@ -32,36 +30,17 @@ float* R__zipZFP(float* array, int size, float tol){
 	zfp_stream_set_accuracy(zfp, tol);
 
 	size_t buffersize = zfp_stream_maximum_size(zfp, arraymeta);
-	void* buffer = malloc(buffersize);
+	buffer = malloc(buffersize);
 
 	bitstream* stream = stream_open(buffer, buffersize);
 	zfp_stream_set_bit_stream(zfp, stream);
 	zfp_stream_rewind(zfp);
 
-	size_t compsize = zfp_compress(zfp, arraymeta);
-	
+	complength = zfp_compress(zfp, arraymeta);
+
 	zfp_field_free(arraymeta);
 	zfp_stream_close(zfp);
 	stream_close(stream);
-	free(buffer);
+	//free(buffer);
 	free(array);
-
-	//Read bitstream
-	auto bstream = zfp.stream;
-
-	void* bstreambuffer;
-	size_t bstreamsize;
-
-
-
-	//Serialize zfp_stream
-	
-	//Cast into float array
-
-
-	float* f;
-
-
-	return f;
-
 }
